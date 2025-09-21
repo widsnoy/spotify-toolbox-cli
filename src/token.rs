@@ -2,7 +2,6 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
     aead::{Aead, AeadCore, KeyInit, OsRng},
 };
-use reqwest;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -116,19 +115,18 @@ async fn flush_or_create_token() -> Result<()> {
     let mut need_refresh = true;
 
     // 尝试读取现有缓存
-    if cache_file_path.exists() {
-        if let Ok(encrypted_data) = fs::read(&cache_file_path) {
-            if encrypted_data.len() > 12 {
-                // 至少需要nonce的长度
-                let nonce = Nonce::from_slice(&encrypted_data[0..12]);
-                if let Ok(decrypted_data) = cipher.decrypt(nonce, &encrypted_data[12..]) {
-                    if let Ok(token_cache) = serde_json::from_slice::<TokenCache>(&decrypted_data) {
-                        // 检查是否还有至少5分钟有效期
-                        if token_cache.expires_at > now + 300 {
-                            need_refresh = false;
-                        }
-                    }
-                }
+    if cache_file_path.exists()
+        && let Ok(encrypted_data) = fs::read(&cache_file_path)
+        && encrypted_data.len() > 12
+    {
+        // 至少需要nonce的长度
+        let nonce = Nonce::from_slice(&encrypted_data[0..12]);
+        if let Ok(decrypted_data) = cipher.decrypt(nonce, &encrypted_data[12..])
+            && let Ok(token_cache) = serde_json::from_slice::<TokenCache>(&decrypted_data)
+        {
+            // 检查是否还有至少5分钟有效期
+            if token_cache.expires_at > now + 300 {
+                need_refresh = false;
             }
         }
     }
